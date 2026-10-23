@@ -1,6 +1,6 @@
 // Reglas fáciles de cambiar:
-// 3 disparos por prueba. Menos de 18 puntos = pierdes la racha.
-// Cada prueba aprobada acelera el blanco y vuelve a dar 3 tiros.
+// 3 disparos por nivel. Menos de 18 puntos = pierdes.
+// El nivel 1 es el campo. Si apruebas, el nivel 2 es la ciudad.
 const MAX_SHOTS = 3;
 const PASS_SCORE = 18;
 const SHOT_GAP = 340;
@@ -148,8 +148,22 @@ function createWorld() {
   renderer.domElement.style.touchAction = "none";
   document.body.prepend(renderer.domElement);
 
+  const rangeSky = makeSky([
+    [0, "#24344d"],
+    [0.42, "#c85b42"],
+    [0.68, "#e8924e"],
+    [0.84, "#f0c48a"],
+    [1, "#f0c48a"],
+  ]);
+  const citySky = makeSky([
+    [0, "#070b16"],
+    [0.42, "#152038"],
+    [0.74, "#243044"],
+    [1, "#2c3848"],
+  ]);
+
   const scene = new THREE.Scene();
-  scene.background = makeSky();
+  scene.background = rangeSky;
   scene.fog = new THREE.Fog(0xf0c48a, 16, 42);
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 80);
@@ -190,16 +204,21 @@ function createWorld() {
   const mountainMat = new THREE.MeshStandardMaterial({ color: 0x5a4d5c, flatShading: true, roughness: 1 });
   const mountainMatFar = new THREE.MeshStandardMaterial({ color: 0x3f4c5a, flatShading: true, roughness: 1 });
 
+  const range = new THREE.Group();
+  const city = new THREE.Group();
+  city.visible = false;
+  scene.add(range, city);
+
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), dirt);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
-  scene.add(ground);
+  range.add(ground);
 
   const lane = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 12), sand);
   lane.rotation.x = -Math.PI / 2;
   lane.position.set(0, 0.012, -1);
   lane.receiveShadow = true;
-  scene.add(lane);
+  range.add(lane);
 
   const line = new THREE.Mesh(
     new THREE.PlaneGeometry(2.4, 0.06),
@@ -207,14 +226,14 @@ function createWorld() {
   );
   line.rotation.x = -Math.PI / 2;
   line.position.set(0, 0.02, 3.15);
-  scene.add(line);
+  range.add(line);
 
-  addMountains(scene, mountainMat, mountainMatFar);
-  addBench(scene, wood);
-  const hay = addHay(scene, hayMat);
+  addMountains(range, mountainMat, mountainMatFar);
+  addBench(range, wood);
+  const hay = addHay(range, hayMat);
 
   const stand = new THREE.Group();
-  scene.add(stand);
+  range.add(stand);
   const postGeo = new THREE.BoxGeometry(0.14, 3.35, 0.14);
   [-3.05, 3.05].forEach((x) => {
     const post = new THREE.Mesh(postGeo, wood);
@@ -271,7 +290,8 @@ function createWorld() {
   hanger.position.y = 1.55;
   mover.add(hanger);
 
-  const flag = addFlag(scene);
+  const rangeFlag = addFlag(range);
+  const cityBuilt = addCity(city);
 
   const tracer = new THREE.Mesh(
     new THREE.CylinderGeometry(0.012, 0.012, 1, 6),
@@ -291,7 +311,8 @@ function createWorld() {
   const holes = [];
   const sparks = [];
   const sparkGeo = new THREE.SphereGeometry(0.025, 6, 6);
-  const colliders = [paper, board, frame, ...hay];
+  const rangeColliders = [paper, board, frame, ...hay];
+  const cityColliders = [paper, board, frame, ...cityBuilt.colliders];
 
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -304,32 +325,38 @@ function createWorld() {
     renderer,
     scene,
     camera,
+    hemi,
+    sun,
     spot,
     mover,
     paper,
     tracer,
-    flag,
+    flag: rangeFlag,
+    range,
+    city,
+    rangeFlag,
+    cityFlag: cityBuilt.flag,
+    rangeSky,
+    citySky,
+    rangeColliders,
+    cityColliders,
     holes,
     sparks,
     sparkGeo,
     holeGeo,
     holeMat,
     holeRingMat,
-    colliders,
+    colliders: rangeColliders,
   };
 }
 
-function makeSky() {
+function makeSky(stops) {
   const canvas = document.createElement("canvas");
   canvas.width = 32;
   canvas.height = 512;
   const g = canvas.getContext("2d");
   const gradient = g.createLinearGradient(0, 0, 0, 512);
-  gradient.addColorStop(0, "#24344d");
-  gradient.addColorStop(0.42, "#c85b42");
-  gradient.addColorStop(0.68, "#e8924e");
-  gradient.addColorStop(0.84, "#f0c48a");
-  gradient.addColorStop(1, "#f0c48a");
+  stops.forEach(([offset, color]) => gradient.addColorStop(offset, color));
   g.fillStyle = gradient;
   g.fillRect(0, 0, 32, 512);
   const texture = new THREE.CanvasTexture(canvas);
@@ -496,6 +523,174 @@ function addFlag(scene) {
   return cloth;
 }
 
+function addCity(parent) {
+  const asphalt = new THREE.Mesh(
+    new THREE.PlaneGeometry(16, 36),
+    new THREE.MeshStandardMaterial({ color: 0x2c333b, roughness: 0.95 })
+  );
+  asphalt.rotation.x = -Math.PI / 2;
+  asphalt.position.set(0, 0.008, -4);
+  asphalt.receiveShadow = true;
+  parent.add(asphalt);
+
+  [-5.6, 5.6].forEach((x) => {
+    const walk = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.4, 36),
+      new THREE.MeshStandardMaterial({ color: 0x6a717a, roughness: 0.9 })
+    );
+    walk.rotation.x = -Math.PI / 2;
+    walk.position.set(x, 0.012, -4);
+    walk.receiveShadow = true;
+    parent.add(walk);
+  });
+
+  const paint = new THREE.MeshStandardMaterial({ color: 0xe7e2d6, roughness: 0.6 });
+  for (let i = 0; i < 8; i += 1) {
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.7), paint);
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(0, 0.02, 2.4 - i * 1.55);
+    parent.add(dash);
+  }
+  for (let i = -4; i <= 4; i += 1) {
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 1.3), paint);
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.position.set(i * 0.46, 0.02, 2.7);
+    parent.add(stripe);
+  }
+
+  const blocks = [
+    [-7.4, 1.4, 3.4, 3.1, 5.6, "#3d4654", 0.45],
+    [-6.6, -4.4, 3.8, 3.2, 8.4, "#2b3340", 0.62],
+    [-8.1, -11, 4.2, 3.4, 11.5, "#222833", 0.35],
+    [6.9, 0.6, 3.2, 3.2, 6.6, "#4a403c", 0.5],
+    [7.3, -5.2, 3.6, 3.1, 9.2, "#313846", 0.58],
+    [6.4, -11.4, 4.4, 3.5, 7.4, "#262c36", 0.4],
+    [-2.2, -20, 2.4, 2.4, 14, "#1a202a", 0.7],
+    [2.8, -22, 2.8, 2.6, 16, "#151b24", 0.55],
+    [8.2, -18.5, 3.2, 3, 12, "#202632", 0.48],
+  ];
+  blocks.forEach(([x, z, w, d, h, wall, lit]) => addBuilding(parent, x, z, w, d, h, wall, lit));
+
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(8.6, 4.4, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x4d555e, roughness: 0.88 })
+  );
+  wall.position.set(0, 2.15, TARGET_Z - 1.35);
+  wall.castShadow = true;
+  wall.receiveShadow = true;
+  wall.userData.kind = "miss";
+  parent.add(wall);
+
+  const metal = new THREE.MeshStandardMaterial({ color: 0x2a3138, metalness: 0.65, roughness: 0.35 });
+  const postGeo = new THREE.BoxGeometry(0.12, 3.35, 0.12);
+  [-3.05, 3.05].forEach((x) => {
+    const post = new THREE.Mesh(postGeo, metal);
+    post.position.set(x, 1.67, TARGET_Z - 0.18);
+    post.castShadow = true;
+    parent.add(post);
+  });
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.1, 0.14), metal);
+  beam.position.set(0, 3.28, TARGET_Z - 0.18);
+  beam.castShadow = true;
+  parent.add(beam);
+
+  addStreetLamp(parent, -2.55, 1.1);
+  addStreetLamp(parent, 2.55, -1.6);
+  addCar(parent, -3.7, 1.8, 0xc23b3b);
+  addCar(parent, 3.85, -0.4, 0x2f5f8a);
+
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.6, 0.42),
+    new THREE.MeshBasicMaterial({ color: 0x39d6c8 })
+  );
+  sign.position.set(-5.5, 3.15, -2.6);
+  parent.add(sign);
+
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.04, 2.5, 8),
+    metal
+  );
+  pole.position.set(4.35, 1.25, 1.4);
+  parent.add(pole);
+  const banner = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xf0c14a, side: THREE.DoubleSide, roughness: 0.6 })
+  );
+  banner.position.set(3.85, 2.2, 1.4);
+  parent.add(banner);
+
+  return { flag: banner, colliders: [wall] };
+}
+
+function addBuilding(parent, x, z, w, d, h, wall, lit) {
+  const map = makeWindows(wall, lit);
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(Math.max(1, w / 2.4), Math.max(1, h / 2.8));
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({
+      map,
+      emissive: 0xf2c56a,
+      emissiveMap: map,
+      emissiveIntensity: 0.42,
+      roughness: 0.86,
+    })
+  );
+  mesh.position.set(x, h / 2, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+}
+
+function makeWindows(wall, litRatio) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 160;
+  const g = canvas.getContext("2d");
+  g.fillStyle = wall;
+  g.fillRect(0, 0, 96, 160);
+  for (let row = 0; row < 5; row += 1) {
+    for (let col = 0; col < 2; col += 1) {
+      const lit = Math.random() < litRatio;
+      g.fillStyle = lit ? "#ffd98a" : "#1b2433";
+      g.fillRect(14 + col * 40, 12 + row * 30, 24, 16);
+    }
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function addStreetLamp(parent, x, z) {
+  const metal = new THREE.MeshStandardMaterial({ color: 0x23282e, metalness: 0.5, roughness: 0.4 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.1, 8), metal);
+  pole.position.set(x, 1.55, z);
+  pole.castShadow = true;
+  parent.add(pole);
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 12, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffe1a8 })
+  );
+  head.position.set(x, 3.12, z);
+  parent.add(head);
+  const lamp = new THREE.PointLight(0xffc56a, 6, 9, 2);
+  lamp.position.set(x, 3, z);
+  parent.add(lamp);
+}
+
+function addCar(parent, x, z, color) {
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.25 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x9fd4e8, roughness: 0.15, metalness: 0.1 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.42, 0.86), paint);
+  body.position.set(x, 0.36, z);
+  body.castShadow = true;
+  parent.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.34, 0.76), glass);
+  cabin.position.set(x - 0.05, 0.7, z);
+  parent.add(cabin);
+}
+
 function buildLegend() {
   const legend = $("legend");
   ZONES.forEach((zone) => {
@@ -564,29 +759,45 @@ function placeCrosshair() {
 
 function motion() {
   if (game.reduceMotion) return { amp: 0.2, speed: 0.45, bob: 0.04 };
-  const step = Math.max(0, game.test - 1);
-  return {
-    amp: Math.min(1.15, 0.7 + step * 0.12),
-    speed: Math.min(1.7, 0.72 + step * 0.22),
-    bob: Math.min(0.22, 0.12 + step * 0.02),
-  };
+  if (game.test >= 2) return { amp: 0.98, speed: 1.08, bob: 0.17 };
+  return { amp: 0.7, speed: 0.72, bob: 0.12 };
+}
+
+function applyLevel(level) {
+  const city = level >= 2;
+  world.range.visible = !city;
+  world.city.visible = city;
+  world.scene.background = city ? world.citySky : world.rangeSky;
+  world.scene.fog.color.set(city ? 0x1a2436 : 0xf0c48a);
+  world.scene.fog.near = city ? 12 : 16;
+  world.scene.fog.far = city ? 40 : 42;
+  world.hemi.color.set(city ? 0x8ea4c8 : 0xffd7b0);
+  world.hemi.groundColor.set(city ? 0x1c242e : 0x6a4e38);
+  world.hemi.intensity = city ? 0.78 : 1.15;
+  world.sun.color.set(city ? 0xc9d6ef : 0xfff0d2);
+  world.sun.intensity = city ? 0.95 : 2.5;
+  world.spot.color.set(city ? 0xffe2a8 : 0xfff4df);
+  world.spot.intensity = city ? 40 : 28;
+  world.flag = city ? world.cityFlag : world.rangeFlag;
+  world.colliders = city ? world.cityColliders : world.rangeColliders;
+  world.renderer.toneMappingExposure = city ? 1.08 : 1.12;
 }
 
 function startGame() {
   game.test = 1;
   game.streak = 0;
   beginRound("Apunta y dispara");
-  say("Prueba 1. Tienes 3 tiros.");
+  say("Nivel 1. Tienes 3 tiros.");
 }
 
 function nextTest() {
-  game.test += 1;
-  beginRound("El blanco va más rápido");
-  say(`Prueba ${game.test}. Otra vez tienes 3 tiros.`);
+  game.test = 2;
+  beginRound("Ciudad. El blanco se mueve más");
+  say("Nivel 2, en la ciudad. Tienes 3 tiros.");
 }
 
 function continueOrRestart() {
-  if (game.phase === "result" && game.score >= PASS_SCORE) nextTest();
+  if (game.phase === "result" && game.score >= PASS_SCORE && game.test < 2) nextTest();
   else startGame();
 }
 
@@ -598,6 +809,7 @@ function beginRound(callout) {
   game.shots = [];
   game.lastShotAt = -Infinity;
   clearHoles();
+  applyLevel(game.test);
   aim.set(0, 0);
   placeCrosshair();
   menu.hidden = true;
@@ -723,7 +935,7 @@ function popText(text, kind) {
 
 function updateHud(callout) {
   const left = MAX_SHOTS - game.shots.length;
-  $("round-label").textContent = `Prueba ${game.test}`;
+  $("round-label").textContent = `Nivel ${game.test}`;
   $("remain").textContent = left === 1 ? "1 tiro" : `${left} tiros`;
   $("remain").parentElement.classList.toggle("warn", left === 1);
   $("score").textContent = String(game.score);
@@ -754,18 +966,22 @@ function finish() {
   const gap = game.score - PASS_SCORE;
   const missing = PASS_SCORE - game.score;
   const pointsWord = (n) => (n === 1 ? "punto" : "puntos");
+  const hasNext = passed && game.test < 2;
   $("stamp").textContent = passed ? "Aprobado" : "Reprobado";
   $("stamp").classList.toggle("win", passed);
-  $("retry").textContent = passed ? "Siguiente prueba" : "Desde el principio";
+  $("retry").textContent = hasNext ? "Nivel 2" : passed ? "Jugar de nuevo" : "Desde el principio";
 
-  if (passed) {
+  if (passed && game.test === 1) {
     const margin = gap === 0 ? "Llegaste justo a la meta." : `Superaste la meta por ${gap} ${pointsWord(gap)}.`;
-    $("result-title").textContent = `Prueba ${game.test} aprobada`;
-    $("result-copy").textContent = `${margin} La siguiente va más rápido y otra vez tienes 3 tiros.`;
-  } else if (game.streak > 0) {
-    const passedWord = game.streak === 1 ? "1 prueba" : `${game.streak} pruebas`;
-    $("result-title").textContent = "Se cortó la racha";
-    $("result-copy").textContent = `Aprobaste ${passedWord} y fallaste la prueba ${game.test}. Te faltaron ${missing} ${pointsWord(missing)}.`;
+    $("result-title").textContent = "Nivel 1 aprobado";
+    $("result-copy").textContent = `${margin} El nivel 2 es en la ciudad y el blanco se mueve un poco más. Otra vez tienes 3 tiros.`;
+  } else if (passed) {
+    const margin = gap === 0 ? "Llegaste justo a la meta." : `Superaste la meta por ${gap} ${pointsWord(gap)}.`;
+    $("result-title").textContent = "Ciudad superada";
+    $("result-copy").textContent = `${margin} Completaste los dos niveles.`;
+  } else if (game.test > 1) {
+    $("result-title").textContent = "Se cortó en la ciudad";
+    $("result-copy").textContent = `Aprobaste el nivel 1 y fallaste el nivel 2. Te faltaron ${missing} ${pointsWord(missing)}.`;
   } else {
     $("result-title").textContent = "Se agotaron los 3 tiros";
     $("result-copy").textContent = `Te faltaron ${missing} ${pointsWord(missing)} para aprobar.`;
@@ -781,7 +997,7 @@ function finish() {
   showBest($("result-best"));
   if (passed) audio.win();
   else audio.lose();
-  say(passed ? `Prueba ${game.test} aprobada. Racha de ${game.streak}.` : `Reprobado en la prueba ${game.test}.`);
+  say(passed ? `Nivel ${game.test} aprobado.` : `Reprobado en el nivel ${game.test}.`);
 }
 
 function showBest(node) {
@@ -838,8 +1054,7 @@ function tick(time) {
   world.mover.position.y = BASE_Y + Math.sin(t * drift.speed * 1.35) * drift.bob;
   world.spot.target.position.x = world.mover.position.x;
   world.spot.target.position.y = world.mover.position.y;
-  world.flag.rotation.y = Math.sin(t * 2.2) * 0.35;
-  world.flag.position.x = -3.72 + Math.sin(t * 2.2) * 0.05;
+  if (world.flag) world.flag.rotation.y = Math.sin(t * 2.2) * 0.28;
 
   if (game.phase === "playing") {
     const step = 0.9 * 0.016;

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tiro al Blanco</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Outfit:wght@380;500;620&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="flash" aria-hidden="true"></div>
+
+    <header id="hud" class="hud" hidden>
+      <div class="chip">
+        <span class="kicker" id="round-label">Prueba 1</span>
+        <strong id="remain">3 tiros</strong>
+        <div id="bullets" class="bullets"></div>
+      </div>
+      <div class="chip score-chip">
+        <span class="kicker">Puntos</span>
+        <strong><span id="score">0</span><span class="goal"> / 18</span></strong>
+        <div class="meter" aria-hidden="true"><span id="meter"></span></div>
+      </div>
+      <div class="chip callout-chip">
+        <span class="kicker">Último tiro</span>
+        <strong id="callout">Apunta y dispara</strong>
+      </div>
+      <div class="hud-actions">
+        <button id="sound" type="button">Sonido</button>
+        <button id="restart" type="button">Reiniciar</button>
+      </div>
+    </header>
+
+    <div id="crosshair" hidden aria-hidden="true"></div>
+    <p id="hint" class="hint" hidden>Clic para disparar · Flechas para apuntar · Espacio dispara</p>
+
+    <section id="menu" class="overlay">
+      <article class="ticket">
+        <p class="eyebrow">Campo de tiro</p>
+        <h1>Tiro al blanco</h1>
+        <p class="lead">Tienes <b>3 tiros</b> antes de perder la prueba.</p>
+        <ul class="rules">
+          <li>El blanco se mueve. Apunta con el mouse y dispara con un clic.</li>
+          <li>Centro 10, rojo 8, azul 6, negro 4, blanco 2. Fuera del papel no suma.</li>
+          <li>Apruebas con <b>18 puntos</b> o más. Si lo logras, sigue otra prueba más rápida, otra vez con 3 tiros.</li>
+        </ul>
+        <div id="legend" class="legend"></div>
+        <button id="start" type="button" disabled>Cargando el campo…</button>
+        <p id="best" class="best"></p>
+        <p id="status" class="status"></p>
+      </article>
+    </section>
+
+    <section id="result" class="overlay" hidden>
+      <article class="ticket">
+        <p id="stamp" class="stamp">Reprobado</p>
+        <h2 id="result-title">Se agotaron los tiros</h2>
+        <p id="result-copy" class="lead"></p>
+        <p class="result-score"><span id="result-score">0</span><span> / 18</span></p>
+        <ol id="log" class="log"></ol>
+        <button id="retry" type="button">Otra prueba</button>
+        <p id="result-best" class="best"></p>
+      </article>
+    </section>
+
+    <p id="live" class="sr-only" aria-live="polite"></p>
+
+    <script src="./vendor/three.min.js"></script>
+    <script src="./game.js"></script>
+  </body>
+</html>
